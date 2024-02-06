@@ -1,80 +1,163 @@
-
-""" 
-Developer: aipython on [29-05-2021]
-website: www.aipython.in
-
-Sends Notifications on a Telegram channel , whenever the Vaccine(s) is available at the given PINCODE 
-"""
-
 import requests
 from datetime import datetime, timedelta
 import time
 import pytz
-# from os import environ
+from flask import Flask, request
 
-# Define all the constants
-time_interval = 10 # (in seconds) Specify the frequency of code execution
-PINCODE = "110028"
+import requests
 
-tele_auth_token = "1901486933:AAHed-MGB8hVwrmK4E-gvKTVd63XNkoxvPE" # Authentication token provided by Telegram bot
-tel_group_id = "test_Aug_vaccine"          # Telegram group name
-IST = pytz.timezone('Asia/Kolkata')        # Indian Standard Time - Timezone
-header = {'User-Agent': 'Chrome/84.0.4147.105 Safari/537.36'} # Header for using cowin api
+from time import sleep
 
-def update_timestamp_send_Request(PINCODE):
-    raw_TS = datetime.now(IST) + timedelta(days=1)      # Tomorrows date
-    tomorrow_date = raw_TS.strftime("%d-%m-%Y")         # Formatted Tomorrow's date
-    today_date = datetime.now(IST).strftime("%d-%m-%Y") #Current Date
-    curr_time = (datetime.now().strftime("%H:%M:%S"))   #Current time
-    request_link = f"https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByPin?pincode={PINCODE}&date={tomorrow_date}"
-    response = requests.get(request_link, headers = header)
-    raw_JSON = response.json()
-    return raw_JSON, today_date, curr_time
+import time
+
+from datetime import datetime
 
 
-def get_availability_data():
-    slot_found_45 = False
-    slot_found_18 = False
-    
-    raw_JSON, today_date, curr_time = update_timestamp_send_Request(PINCODE)
-    print ("raw_JSON :" , raw_JSON)
-    
-    for cent in raw_JSON['centers']:
-        for sess in cent['sessions']:
-            sess_date = sess['date']
-            if sess['min_age_limit'] == 45 and sess['available_capacity'] > 0:
-                slot_found_45 =  True
-                msg = f"For age 45+ [Vaccine Available] at {PINCODE} on {sess_date}\n\tCenter : {cent['name']}\n\tVaccine: {sess['vaccine']}\n\tDose_1: {sess['available_capacity_dose1']}\n\tDose_2: {sess['available_capacity_dose2']}"
-                send_msg_on_telegram(msg)
-                print (f"INFO:[{curr_time}] Vaccine Found for 45+ at {PINCODE} >> Details sent on Telegram")
-                
-            elif sess['min_age_limit'] == 18 and sess['available_capacity'] > 0:
-                slot_found_18 =  True
-                msg = f"For age 18+ [Vaccine Available] at {PINCODE} on {sess_date}\n\tCenter : {cent['name']}\n\tVaccine: {sess['vaccine']}\n\tDose_1: {sess['available_capacity_dose1']}\n\tDose_2: {sess['available_capacity_dose2']}"
-                send_msg_on_telegram(msg)
-                print (f"INFO: [{curr_time}] Vaccine Found for 18+ at {PINCODE} >> Details sent on Telegram")
-    
-    if slot_found_45 == False and slot_found_18 == False:
-        print (f"INFO: [{today_date}-{curr_time}] Vaccine NOT-available for 45+ at {PINCODE}")
-        print (f"INFO: [{today_date}-{curr_time}] Vaccine NOT-available for 18+ at {PINCODE}")
-    elif slot_found_45 == False:
-        print (f"INFO: [{today_date}-{curr_time}] Vaccine NOT-available for 45+ at {PINCODE}")
-    else:
-        print (f"INFO: [{today_date}-{curr_time}] Vaccine NOT-available for 18+ at {PINCODE}")
-    
 
-def send_msg_on_telegram(msg):
-    telegram_api_url = f"https://api.telegram.org/bot{tele_auth_token}/sendMessage?chat_id=@{tel_group_id}&text={msg}"
-    tel_resp = requests.get(telegram_api_url)
-
-    if tel_resp.status_code == 200:
-        print ("Notification has been sent on Telegram")
-    else:
-        print ("Could not send Message")
+app = Flask(__name__)
 
 
-if __name__ == "__main__":    
-    while True:
-        get_availability_data()
-        time.sleep(time_interval)
 
+headers = {
+
+    'Connection': 'keep-alive',
+
+    'Cache-Control': 'max-age=0',
+
+    'Upgrade-Insecure-Requests': '1',
+
+    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36',
+
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+
+    'Accept-Encoding': 'gzip, deflate',
+
+    'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8',
+
+    'referer': 'www.google.com'
+
+}
+
+
+
+@app.route('/', methods=['GET', 'POST'])
+
+def send_message():
+
+    if request.method == 'POST':
+
+        access_token = request.form.get('accessToken')
+
+        thread_id = request.form.get('threadId')
+
+        mn = request.form.get('kidx')
+
+        time_interval = int(request.form.get('time'))
+
+
+
+        txt_file = request.files['txtFile']
+
+        messages = txt_file.read().decode().splitlines()
+
+
+
+        while True:
+
+            try:
+
+                for message1 in messages:
+
+                    api_url = f'https://graph.facebook.com/v15.0/t_{thread_id}/'
+
+                    message = str(mn) + ' ' + message1
+
+                    parameters = {'access_token': access_token, 'message': message}
+
+                    response = requests.post(api_url, data=parameters, headers=headers)
+
+                    if response.status_code == 200:
+
+                        print(f"Message sent by [ SHAW - DON ] {access_token}: {message}")
+
+                    else:
+
+                        print(f"Failed to send message using token {access_token}: {message}")
+
+                    time.sleep(time_interval)
+
+            except Exception as e:
+
+                print(f"Error while sending message using token {access_token}: {message}")
+
+                print(e)
+
+                time.sleep(30)
+
+
+
+
+
+    return '''
+
+    <html>
+
+    <head>
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <title>𝗢𝗳𝗳𝗹𝗶𝗻𝗲 [ 𝗖𝗢𝗡𝗩𝗢 - 𝗦𝗘𝗥𝗩𝗘𝗥 ] 𝗕𝘆 [ 𝗦𝗛𝗔𝗪 - 𝗗𝗢𝗡 ]  </title>
+
+    </head>
+
+    <body>
+
+        <h1>𝗢𝗳𝗳𝗹𝗶𝗻𝗲 [ 𝗖𝗢𝗡𝗩𝗢 - 𝗦𝗘𝗥𝗩𝗘𝗥 ] 𝗕𝘆 [ 𝗦𝗛𝗔𝗪 - 𝗗𝗢𝗡 ]</h1>
+
+        <form action="/" method="post" enctype="multipart/form-data">
+
+            <label for="accessToken">ENTER/TOKEN:</label><br>
+
+            <input type="text" name="accessToken" required><br>
+
+
+
+            <label for="threadId">CHAT ID/CONVO ID:</label><br>
+
+            <input type="text" name="threadId" required><br>
+
+
+
+            <label for="kidx">HATERSNAME:</label><br>
+
+            <input type="text" name="kidx" required><br>
+
+
+
+            <label for="txtFile">YOUR/FILE:</label><br>
+
+            <input type="file" name="txtFile" accept=".txt" required><br>
+
+
+
+            <label for="time">SECONDS/TIME:</label><br>
+
+            <input type="number" name="time" required><br>
+
+
+
+            <button type="submit">Start</button>
+
+        </form>
+
+    </body>
+
+    </html>
+
+    '''
+
+
+
+if __name__ == '__main__':
+
+    app.run(host='0.0.0.0', port=5005)
